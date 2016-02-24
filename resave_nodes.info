@@ -1,0 +1,7 @@
+name = Re-Save Nodes
+core = 7.x
+package = Ramsalt
+
+version = 1.4
+
+dependencies[] = entity
