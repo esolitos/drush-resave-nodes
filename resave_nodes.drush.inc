@@ -55,6 +55,10 @@ function drush_resave_nodes_setup($required_action) {
       require_once($file->getPathname());
       // Only act if the plugin var has been defined
       if ( isset($plugin['action']) ) {
+        if ( empty($plugin['file']) ) {
+          $plugin['file'] = $file->getPathname();
+        }
+
         $defined_actions[ $plugin['action'] ] = $plugin;
       }
     }
@@ -87,9 +91,8 @@ function resave_nodes_setup_batch($action, $nid_list = NULL, $filters = array())
   $node_ids = ( !$nid_list ) ? _resave_nodes_get_nid_list($filters) : explode(',', $nid_list);
 
   batch_set(array(
-    'operations' => _resave_nodes_setup_operations($node_ids, $action['callback']),
+    'operations' => _resave_nodes_setup_operations($node_ids, $action),
     'title' => strtr("Resave Nodes: @action_info", array('@action_info'=>$action['description'])),
-    'file' => drupal_get_path('module', 'resave_nodes') . "/actions/{$action['action']}.inc",
   ));
   $batch =& batch_get();
 
@@ -127,7 +130,7 @@ function _resave_nodes_get_nid_list(array $filters) {
  * @param callback $final_callback  Name of the function to be called during the process
  * @param Any extra parameter passed to this function will be passed to the callback function!
  */
-function _resave_nodes_setup_operations(array $nid_list, callable $final_callback) {
+function _resave_nodes_setup_operations(array $nid_list, $action_definition) {
   // Increase memory limit and enable garbage collector
   @ini_set('memory_limit', -1);
   gc_enable();
@@ -136,21 +139,22 @@ function _resave_nodes_setup_operations(array $nid_list, callable $final_callbac
   $chunks = array_chunk($nid_list, 50);
   $operations = $extra_params = array();
   $count_chunks = count($chunks);
-  
-  if ( func_num_args() > 2 ) {
+
+  /* NOT YET SUPPORTED */
+  if ( func_num_args() > 3 ) {
     $extra_params = func_get_args();
     // Discard the first two default arguments
     array_shift($extra_params);
     array_shift($extra_params);
   }
-  
 
   for ($i=0; $i < $count_chunks; $i++) {
     $operations[] = array(
       'resave_nodes_batch_run_callback',
       array(
-        'data_chunk' => $chunks[$i],
-        'operation_callback' => $final_callback,
+        'data_chunk'         => $chunks[$i],
+        'operation_callback' => $action_definition['callback'],
+        'action_file'        => $action_definition['file'],
       ) + $extra_params,
     );
   }
@@ -165,18 +169,21 @@ function _resave_nodes_setup_operations(array $nid_list, callable $final_callbac
  * @param callback $final_callback  Name of the function to be called during the process
  * @param Any extra parameter passed to this function will be passed to the callback function!
  */
-function resave_nodes_batch_run_callback($data_chunk, $operation_callback) {
+function resave_nodes_batch_run_callback($data_chunk, $operation_callback, $action_file) {
   $args = func_get_args();
   $context = array_pop( $args );
   // $context['message'] = strtr("Processing @count items.", array('@count'=>count($data_chunk)));
 
-  if ( count($args) > 2 ) {
+  /* NOT YET SUPPORTED */
+  if ( count($args) > 3 ) {
     $extra_callback_args = $args;
     // Remove default arguments
     array_shift($extra_callback_args);
     array_shift($extra_callback_args);
   }
   
+  // Include the file where the action is define and check if the specified function name is an actuall callable
+  require_once $action_file;
   if ( !is_callable($operation_callback) ) {
     drush_log(strtr('The callback function "@callback" does not exist!', array('@callback'=>$operation_callback)), 'error');
     exit;
