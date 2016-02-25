@@ -82,17 +82,15 @@ function drush_resave_nodes_setup($required_action) {
   }
 }
 
-
-
 /**
  * Example function to setup a batch and run it
  */
-function resave_nodes_setup_batch($action, $nid_list = NULL, $filters = array()) {
+function resave_nodes_setup_batch($action_plugin, $nid_list = NULL, $filters = array()) {
   $node_ids = ( !$nid_list ) ? _resave_nodes_get_nid_list($filters) : explode(',', $nid_list);
 
   batch_set(array(
-    'operations' => _resave_nodes_setup_operations($node_ids, $action),
-    'title' => strtr("Resave Nodes: @action_info", array('@action_info'=>$action['description'])),
+    'operations' => _resave_nodes_setup_operations($node_ids, $action_plugin),
+    'title' => strtr("Resave Nodes: @action_info", array('@action_info'=>$action_plugin['description'])),
   ));
   $batch =& batch_get();
 
@@ -101,9 +99,6 @@ function resave_nodes_setup_batch($action, $nid_list = NULL, $filters = array())
   //Start processing the batch operations.
   drush_backend_batch_process();
 }
-
-
-
 
 /**
  * Gets some node ids based on node type and optional limits
@@ -120,6 +115,8 @@ function _resave_nodes_get_nid_list(array $filters) {
     $nodes_query->range($filters['offset'], $filters['limit']);
   }
 
+  $nodes_query->orderBy('nid', 'ASC');
+
   return (array) $nodes_query->execute()->fetchCol();
 }
 
@@ -127,10 +124,10 @@ function _resave_nodes_get_nid_list(array $filters) {
  * Creates an array of operations based on a node list and a callback function
  *
  * @param array $nid_list  List of node IDs
- * @param callback $final_callback  Name of the function to be called during the process
+ * @param plugin with name reference to callback function that will be called during the process
  * @param Any extra parameter passed to this function will be passed to the callback function!
  */
-function _resave_nodes_setup_operations(array $nid_list, $action_definition) {
+function _resave_nodes_setup_operations(array $nid_list, $action_plugin) {
   // Increase memory limit and enable garbage collector
   @ini_set('memory_limit', -1);
   gc_enable();
@@ -141,7 +138,7 @@ function _resave_nodes_setup_operations(array $nid_list, $action_definition) {
   $count_chunks = count($chunks);
 
   /* NOT YET SUPPORTED */
-  if ( func_num_args() > 3 ) {
+  if ( func_num_args() > 2 ) {
     $extra_params = func_get_args();
     // Discard the first two default arguments
     array_shift($extra_params);
@@ -153,8 +150,8 @@ function _resave_nodes_setup_operations(array $nid_list, $action_definition) {
       'resave_nodes_batch_run_callback',
       array(
         'data_chunk'         => $chunks[$i],
-        'operation_callback' => $action_definition['callback'],
-        'action_file'        => $action_definition['file'],
+        'operation_callback' => $action_plugin['callback'],
+        'action_file'        => $action_plugin['file'],
       ) + $extra_params,
     );
   }
@@ -165,19 +162,20 @@ function _resave_nodes_setup_operations(array $nid_list, $action_definition) {
 /**
  * Loads several nodes and run a callback function
  *
- * @param array $nid_list  List of node IDs
- * @param callback $final_callback  Name of the function to be called during the process
+ * @param array $data_chuck  List of node IDs
+ * @param callback $operation_callback Name of the function to be called during the process
+ * @param string $action_file file name of file containing the callback function
  * @param Any extra parameter passed to this function will be passed to the callback function!
  */
 function resave_nodes_batch_run_callback($data_chunk, $operation_callback, $action_file) {
   $args = func_get_args();
   $context = array_pop( $args );
-  // $context['message'] = strtr("Processing @count items.", array('@count'=>count($data_chunk)));
 
   /* NOT YET SUPPORTED */
   if ( count($args) > 3 ) {
     $extra_callback_args = $args;
     // Remove default arguments
+    array_shift($extra_callback_args);
     array_shift($extra_callback_args);
     array_shift($extra_callback_args);
   }
@@ -200,12 +198,17 @@ function resave_nodes_batch_run_callback($data_chunk, $operation_callback, $acti
     else {
       // Call the actual function that will do the magic!
       drush_log('Calling final callback internal function.', 'notice');
-
-      $callback_succeded = $operation_callback($node_wrapper, $extra_callback_args);
+      if(isset($extra_callback_args)) {
+        $callback_succeded = $operation_callback($node_wrapper, $extra_callback_args);
+      } else {
+        $callback_succeded = $operation_callback($node_wrapper);
+      }
       
       // Save only if the callback says that it's all good
       if ( $callback_succeded ) {
         $node_wrapper->save();
+      } else {
+        drush_log('Node not saved.', 'notice');
       }
     }
 
