@@ -36,4 +36,4 @@ xmlrpc.php
 /themes
 
 # Ignore other actions
-actions/
+#actions/

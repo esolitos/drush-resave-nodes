@@ -30,7 +30,7 @@ function meta_canonical_callback(EntityMetadataWrapper &$node_wrapper) {
     '@og_url'    => $og_url,
   );
   $log_message = 'Node: @nid, title: "@title", language: @language, canonical: @canonical, og:url: @og_url.';
-  drush_log(strtr($log_message, $log_vars), 'ok');
+  drush_log(strtr($log_message, $log_vars), 'debug');
 
   $new_canonical = '[current-page:url:absolute]/?test=' . $node_wrapper->changed->value();
   $metatags = array(
@@ -49,8 +49,8 @@ function meta_canonical_callback(EntityMetadataWrapper &$node_wrapper) {
     '@nid'   => $node_wrapper->nid->value(),
     '@canonical' =>  $new_canonical,
   );
-  drush_log(strtr("Node: @nid, metatags saved with canonical: @canonical", $log_vars2), 'ok');
-  
+  drush_log(strtr("Node: @nid, metatags saved with canonical: @canonical", $log_vars2), 'debug');
+
   // Do not save this node!
   return FALSE;
 }
