@@ -108,7 +108,7 @@ function _resave_nodes_get_nid_list(array $filters) {
     ->fields('n', array('nid'));
 
   if ( !empty($filters['bundle']) ) {
-    $nodes_query->condition('type', $node_type);
+    $nodes_query->condition('type', $filters['bundle']);
   }
 
   if ( !empty($filters['offset']) || !empty($filters['limit']) ) {
